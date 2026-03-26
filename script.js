@@ -1060,7 +1060,7 @@
 
       const orderSummary = itemsSummary.replace(/\n/g, " | ");
       if (typeof submitOrderToGoogleSheets === "function") {
-        submitOrderToGoogleSheets(name, userEmail, orderId, orderSummary);
+        submitOrderToGoogleSheets(orderId, orderSummary);
       }
     } catch (e) {
       ErrorHandler.handle(e, "حفظ الطلب في السجل المركزي");
@@ -5727,20 +5727,18 @@ function removeFromOutbox(id) {
 
 function sendToGoogleSheets(payload) {
   const url =
-    "https://script.google.com/macros/s/AKfycbwYFr42NbcQOJ1kuwiaj8d8e5dIXlOsoLlSFc6V5KRJ2ukeyRJmzVJx7CrGHhYHbosvEQ/exec";
+    "https://script.google.com/macros/s/AKfycbzm90KwXPRk7nWlwIhLCYHQMBcxKuvOtNFiDBZv83FSj6kC-Wzs21zvAk281KzKpXEm7Q/exec";
 
-  // Use URLSearchParams as per new code - البيانات السبعة بالترتيب الصحيح
+  // Use URLSearchParams as per new code - البيانات الثمانية بالترتيب الصحيح
   const orderData = new URLSearchParams();
   orderData.append("orderID", payload.orderID || "ORD-" + Date.now());
-  orderData.append("userName", payload.name || "Ibrahim mohamed");
-  orderData.append("userPhone", payload.phone || "201021279663");
-  orderData.append("userEmail", payload.email || "ibra7im.engineer@gmail.com");
-  orderData.append("orderSummary", payload.orderType || "بيتزا مارغريتا x 1");
-  orderData.append("totalPrice", payload.orderPrice || "170 ج.م");
-  orderData.append(
-    "Date",
-    payload.timestamp || new Date().toLocaleString("ar-EG"),
-  );
+  orderData.append("userName", payload.userName || "بدون اسم");
+  orderData.append("userPhone", payload.userPhone || "201021279663");
+  orderData.append("userAddress", payload.userAddress || "بدون عنوان");
+  orderData.append("userEmail", payload.userEmail || "بدون بريد");
+  orderData.append("orderSummary", payload.orderSummary || "طلب غير محدد");
+  orderData.append("totalPrice", payload.totalPrice || "0");
+  orderData.append("Date", payload.Date || new Date().toISOString());
 
   // Try fetch with no-cors mode as per new code
   return fetch(url, {
@@ -5810,37 +5808,35 @@ function processOutbox() {
 }
 
 // Public helper: submit order payload (validated) — enqueue for reliable delivery
-function submitOrderToGoogleSheets(
-  orderName,
-  orderEmail,
-  orderId,
-  orderSummary,
-) {
+function submitOrderToGoogleSheets(orderId = "", orderSummary = "") {
   // جلب البيانات الديناميكية من الشاشة
-  const name =
-    document.getElementById("userName")?.value?.trim() ||
-    orderName ||
-    "بدون اسم";
-  const phone =
+  const userName =
+    document.getElementById("userName")?.value?.trim() || "بدون اسم";
+  const userPhone =
     document.getElementById("userPhone")?.value?.trim() || "201021279663";
-  const email =
-    document.getElementById("userEmail")?.value?.trim() ||
-    orderEmail ||
-    "بدون بريد";
-  const orderType = orderSummary || "بيتزا مارغريتا x 1";
+  const userAddress =
+    document.getElementById("userAddress")?.value?.trim() || "بدون عنوان";
+  const userEmail =
+    document.getElementById("userEmail")?.value?.trim() || "بدون بريد";
+
+  const orderSummaryValue =
+    orderSummary ||
+    document.getElementById("orderSummary")?.textContent?.trim() ||
+    "طلب غير محدد";
   const orderPriceElement = document.getElementById("totalPrice");
-  const orderPrice = orderPriceElement
+  const totalPrice = orderPriceElement
     ? orderPriceElement.textContent.trim()
-    : "170 ج.م";
+    : "0";
 
   const payload = {
     orderID: orderId || "ORD-" + Date.now(),
-    name: name,
-    phone: phone,
-    email: email,
-    orderType: orderType,
-    orderPrice: orderPrice,
-    timestamp: new Date().toISOString(),
+    userName,
+    userPhone,
+    userAddress,
+    userEmail,
+    orderSummary: orderSummaryValue,
+    totalPrice,
+    Date: new Date().toISOString(),
   };
 
   enqueueSubmission(payload);
