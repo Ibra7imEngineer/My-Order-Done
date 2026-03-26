@@ -856,6 +856,16 @@
   }
 
   function finishOrder() {
+    // تعطيل الزر فوراً جداً لمنع أي تكرار للطلبات
+    const submitBtn = document.querySelector(
+      '.confirm-btn[data-action="finish-order"]',
+    );
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.style.opacity = "0.5";
+      submitBtn.style.cursor = "not-allowed";
+    }
+
     // التحقق من البيانات باستخدام Validator متقدم
     const name = document.getElementById("userName")?.value?.trim();
     const address = document.getElementById("userAddress")?.value?.trim();
@@ -1121,6 +1131,11 @@
       } catch (error) {
         LoadingManager.hide();
         ErrorHandler.handle(error, "إرسال الطلب");
+        // إعادة تفعيل الزر في حالة الفشل
+        const submitBtn = document.querySelector(
+          '.confirm-btn[data-action="finish-order"]',
+        );
+        if (submitBtn) submitBtn.disabled = false;
       }
     }, 500);
   }
@@ -5712,19 +5727,26 @@ function removeFromOutbox(id) {
 
 function sendToGoogleSheets(payload) {
   const url =
-    "https://script.google.com/macros/s/AKfycbynblSftffV6wM-1iP0gJrMAmTlPxRrN7LCEXdf6jiQ9_BaoOrCVp6i9NlByC_6ae-fmg/exec";
+    "https://script.google.com/macros/s/AKfycbwYFr42NbcQOJ1kuwiaj8d8e5dIXlOsoLlSFc6V5KRJ2ukeyRJmzVJx7CrGHhYHbosvEQ/exec";
 
-  // Use application/x-www-form-urlencoded to avoid CORS preflight (simple request)
-  const bodyStr = new URLSearchParams(payload).toString();
+  // Use URLSearchParams as per new code - البيانات السبعة بالترتيب الصحيح
+  const orderData = new URLSearchParams();
+  orderData.append("orderID", payload.orderID || "ORD-" + Date.now());
+  orderData.append("userName", payload.name || "Ibrahim mohamed");
+  orderData.append("userPhone", payload.phone || "201021279663");
+  orderData.append("userEmail", payload.email || "ibra7im.engineer@gmail.com");
+  orderData.append("orderSummary", payload.orderType || "بيتزا مارغريتا x 1");
+  orderData.append("totalPrice", payload.orderPrice || "170 ج.م");
+  orderData.append(
+    "Date",
+    payload.timestamp || new Date().toLocaleString("ar-EG"),
+  );
 
-  // Try fetch first with simple POST; treat opaque responses as success (Apps Script often doesn't return CORS headers)
+  // Try fetch with no-cors mode as per new code
   return fetch(url, {
     method: "POST",
-    body: bodyStr,
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-    },
-    keepalive: true,
+    body: orderData,
+    mode: "no-cors",
   })
     .then((res) => {
       if (res.ok || res.type === "opaque")
@@ -5735,7 +5757,7 @@ function sendToGoogleSheets(payload) {
       // Fallback to sendBeacon for best-effort delivery (no response expected)
       try {
         if (navigator && navigator.sendBeacon) {
-          const blob = new Blob([bodyStr], {
+          const blob = new Blob([orderData.toString()], {
             type: "application/x-www-form-urlencoded;charset=UTF-8",
           });
           const ok = navigator.sendBeacon(url, blob);
@@ -5794,44 +5816,35 @@ function submitOrderToGoogleSheets(
   orderId,
   orderSummary,
 ) {
-  const nameValidation = DataProcessor.validateName(orderName);
-  const emailValidation = DataProcessor.validateEmail(orderEmail);
-  const orderValidation = DataProcessor.validateOrder(orderSummary);
+  // جلب البيانات الديناميكية من الشاشة
+  const name =
+    document.getElementById("userName")?.value?.trim() ||
+    orderName ||
+    "بدون اسم";
+  const phone =
+    document.getElementById("userPhone")?.value?.trim() || "201021279663";
+  const email =
+    document.getElementById("userEmail")?.value?.trim() ||
+    orderEmail ||
+    "بدون بريد";
+  const orderType = orderSummary || "بيتزا مارغريتا x 1";
+  const orderPriceElement = document.getElementById("totalPrice");
+  const orderPrice = orderPriceElement
+    ? orderPriceElement.textContent.trim()
+    : "170 ج.م";
 
   const payload = {
-    name: nameValidation.valid ? nameValidation.data : orderName || "بدون اسم",
-    email: emailValidation.valid
-      ? emailValidation.data
-      : orderEmail || "بدون بريد",
-    order: orderValidation.valid ? orderValidation.data : `طلب #${orderId}`,
-    orderId: orderId || null,
+    orderID: orderId || "ORD-" + Date.now(),
+    name: name,
+    phone: phone,
+    email: email,
+    orderType: orderType,
+    orderPrice: orderPrice,
     timestamp: new Date().toISOString(),
   };
 
   enqueueSubmission(payload);
   logEvent("ENQUEUE_ORDER", { orderId });
-
-  // 📊 تسجيل الطلب في Google Sheets
-  if (
-    typeof GoogleSheetsLogger !== "undefined" &&
-    GoogleSheetsLogger.logNewOrder
-  ) {
-    GoogleSheetsLogger.logNewOrder({
-      orderId: orderId,
-      customerName: payload.name,
-      customerEmail: payload.email,
-      items: orderSummary || "طلب جديد",
-      totalAmount: cart.reduce(
-        (sum, item) => sum + item.price * (item.qty || 1),
-        0,
-      ),
-      shippingFee: SHIPPING_FEE,
-      deliveryAddress:
-        localStorage.getItem("deliveryAddress") || "عنوان غير محدد",
-      paymentMethod: localStorage.getItem("paymentMethod") || "كاش",
-      status: "جديد",
-    });
-  }
 }
 
 window.submitOrderToGoogleSheets = submitOrderToGoogleSheets;
