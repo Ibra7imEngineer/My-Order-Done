@@ -17,17 +17,17 @@ const IMAGE_CACHE = "myorder-images-v2";
 
 // Assets to cache on install
 const STATIC_ASSETS = [
-  "/",
-  "/index.html",
-  "/offline.html",
-  "/style.css",
-  "/script.js",
-  "/manifest.json",
-  "/icons/icon-192.svg",
-  "/icons/icon-512.svg",
-  "/icons/apple-touch-icon-180.png",
-  "/icons/apple-touch-icon-152.png",
-  "/icons/apple-touch-icon-120.png",
+  "./",
+  "./index.html",
+  "./offline.html",
+  "./style.css",
+  "./script.js",
+  "./manifest.json",
+  "./icons/icon-192.svg",
+  "./icons/icon-512.svg",
+  "./icons/apple-touch-icon-180.png",
+  "./icons/apple-touch-icon-152.png",
+  "./icons/apple-touch-icon-120.png",
   "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css",
 ];
 
@@ -167,7 +167,7 @@ async function cacheFirst(request, cacheName) {
     console.error("[SW] Fetch failed:", error);
     // Return offline fallback for images
     if (isImageRequest(request)) {
-      return caches.match("/icons/icon-192.svg");
+      return caches.match("./icons/icon-192.svg");
     }
     throw error;
   }
@@ -175,6 +175,8 @@ async function cacheFirst(request, cacheName) {
 
 // Network First strategy
 async function networkFirst(request, cacheName) {
+  const url = new URL(request.url);
+
   try {
     const networkResponse = await fetch(request);
 
@@ -194,12 +196,15 @@ async function networkFirst(request, cacheName) {
 
     // Return offline page for navigation
     if (request.mode === "navigation") {
-      if (url.pathname.startsWith("/admin")) {
+      if (
+        url.pathname.startsWith("./admin") ||
+        url.pathname.startsWith("/admin")
+      ) {
         // serve lightweight offline page when admin UI can't load
-        const offlineMatch = await caches.match("/offline.html");
+        const offlineMatch = await caches.match("./offline.html");
         if (offlineMatch) return offlineMatch;
       }
-      return caches.match("/index.html");
+      return caches.match("./index.html");
     }
 
     throw error;
@@ -244,8 +249,8 @@ async function syncOrders() {
 self.addEventListener("push", (event) => {
   const options = {
     body: event.data ? event.data.text() : "New order received!",
-    icon: "/icons/icon-192.svg",
-    badge: "/icons/icon-192.svg",
+    icon: "./icons/icon-192.svg",
+    badge: "./icons/icon-192.svg",
     vibrate: [100, 50, 100],
     data: {
       dateOfArrival: Date.now(),
@@ -264,7 +269,7 @@ self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
   if (event.action === "view") {
-    event.waitUntil(clients.openWindow("/admin/"));
+    event.waitUntil(clients.openWindow("./admin/"));
   }
 });
 

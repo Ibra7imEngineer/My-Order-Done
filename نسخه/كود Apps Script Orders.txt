@@ -1,0 +1,74 @@
+اسم العمود 
+Order ID	Customer Name	Phone Number	Address	Email	Item Name	Category	Price	​Total Amount	Date & Time	  Order Status
+ 
+كود 
+function doPost(e) {
+  try {
+    // 1. تحديد الشيت والورقة الأولى
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheets()[0]; 
+    
+    // 2. استقبال البيانات من الموقع
+    var data = JSON.parse(e.postData.contents);
+    var orderId = data.orderId || "N/A";
+
+    // --- 3. صمام الأمان: التأكد إن الـ ID مش متكرر ---
+    if (orderId !== "N/A") {
+      var lastRow = sheet.getLastRow();
+      if (lastRow > 0) {
+        var existingIds = sheet.getRange(1, 1, lastRow, 1).getValues().flat();
+        if (existingIds.indexOf(orderId) !== -1) {
+          return ContentService.createTextOutput("الطلب موجود بالفعل")
+            .setMimeType(ContentService.MimeType.TEXT);
+        }
+      }
+    }
+
+    // 4. تجهيز البيانات الأساسية
+    var customerName = data.customerName || "غير معروف";
+    var phone        = data.phone || "";
+    var address      = data.address || "";
+    var email        = data.email || "";
+    var orderDate    = data.orderDate || new Date().toLocaleString("ar-EG");
+    var status       = data.status || "جديد";
+    var items        = data.items;
+
+    // 5. تسجيل البيانات
+    if (items && items.length > 0) {
+      var rowsToAppend = [];
+      
+      items.forEach(function(item) {
+        // حساب الإجمالي لكل صنف (السعر * الكمية) 
+        // لو الـ Front-end بيبعت القيمة جاهزة استخدم item.totalAmount
+        var totalAmount = item.totalAmount || (item.price * (item.quantity || 1));
+
+        rowsToAppend.push([
+          orderId,           // Column A: Order ID
+          customerName,      // Column B: Customer Name
+          "'" + phone,       // Column C: Phone
+          address,           // Column D: Address
+          email,             // Column E: Email
+          item.name,         // Column F: Item Name
+          item.category,     // Column G: Category
+          item.price,        // Column H: Price
+          totalAmount,       // Column I: Total Amount (العمود الجديد)
+          orderDate,         // Column J: Date & Time
+          status             // Column K: Order Status
+        ]);
+      });
+
+      // إضافة كل الصفوف مرة واحدة
+      sheet.getRange(sheet.getLastRow() + 1, 1, rowsToAppend.length, rowsToAppend[0].length)
+           .setValues(rowsToAppend);
+    }
+
+    return ContentService.createTextOutput("تم التسجيل بنجاح")
+      .setMimeType(ContentService.MimeType.TEXT);
+
+  } catch (error) {
+    return ContentService.createTextOutput("خطأ: " + error.message)
+      .setMimeType(ContentService.MimeType.TEXT);
+  }
+}
+
+               script.js   غير كل الروابط معدا الرتبط الاول  لي في
